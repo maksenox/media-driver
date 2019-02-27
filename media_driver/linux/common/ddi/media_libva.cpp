@@ -4287,7 +4287,13 @@ VAStatus DdiMedia_DeriveImage (
          vaimg->offsets[1]               = mediaSurface->iHeight * mediaSurface->iPitch;
          vaimg->offsets[2]               = vaimg->offsets[1] + 2;
         break;
-     default:
+     case Media_Format_AYUV:
+        vaimg->format.bits_per_pixel    = 32;
+        vaimg->data_size                = mediaSurface->iPitch * mediaSurface->iHeight;
+        vaimg->num_planes               = 1;
+        vaimg->pitches[0]               = mediaSurface->iPitch;
+        break;
+     case Media_Format_NV12:
         vaimg->format.bits_per_pixel    = 12;
         vaimg->data_size                = mediaSurface->iPitch * mediaSurface->iHeight * 3 / 2;
         vaimg->num_planes               = 2;
@@ -4296,6 +4302,9 @@ VAStatus DdiMedia_DeriveImage (
         vaimg->pitches[2]               = mediaSurface->iPitch;
         vaimg->offsets[1]               = mediaSurface->iHeight * mediaSurface->iPitch;
         vaimg->offsets[2]               = vaimg->offsets[1] + 1;
+        break;
+     default:
+        DDI_CHK_CONDITION(false, "Unknonw mediaSurface->format", VA_STATUS_ERROR_OPERATION_FAILED);
         break;
     }
     
