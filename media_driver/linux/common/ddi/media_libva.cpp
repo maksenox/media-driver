@@ -643,6 +643,8 @@ DDI_MEDIA_FORMAT DdiMedia_OsFormatAlphaMaskToMediaFormat(int32_t fourcc, int32_t
             return Media_Format_P010;
         case VA_FOURCC_AYUV:
             return Media_Format_AYUV;
+        case VA_FOURCC_Y410:
+            return Media_Format_Y410;
         default:
             return Media_Format_Count;
     }
@@ -4287,6 +4289,7 @@ VAStatus DdiMedia_DeriveImage (
          vaimg->offsets[1]               = mediaSurface->iHeight * mediaSurface->iPitch;
          vaimg->offsets[2]               = vaimg->offsets[1] + 2;
         break;
+     case Media_Format_Y410:
      case Media_Format_AYUV:
         vaimg->format.bits_per_pixel    = 32;
         vaimg->data_size                = mediaSurface->iPitch * mediaSurface->iHeight;
