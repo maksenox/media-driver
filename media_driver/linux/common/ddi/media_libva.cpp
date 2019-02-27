@@ -4604,6 +4604,23 @@ VAStatus DdiMedia_GetImage(
     return VA_STATUS_SUCCESS;
 }
 
+static VAStatus DdiMedia_CopyPlane(DDI_MEDIA_SURFACE dst, DDI_MEDIA_SURFACE src)
+{
+    printf("width height dst %dx%d src %dx%d\n",dst.iWidth, dst.iRealHeight,src.iWidth ,src.iRealHeight);
+    DDI_CHK_CONDITION((dst.iWidth != src.iWidth || dst.iRealHeight != src.iRealHeight), "DDI:Failed to copy surface plane.", VA_STATUS_ERROR_OPERATION_FAILED);
+    uint32_t rowSize = std::min(dst.iPitch, src.iPitch);
+    for (int y = 0; y < dst.iRealHeight; y += 1)
+    {
+        MOS_STATUS eStatus = MOS_SecureMemcpy(dst.pData, rowSize, src.pData, rowSize);
+        DDI_CHK_CONDITION((eStatus != MOS_STATUS_SUCCESS), "DDI:Failed to copy image to surface buffer data!", VA_STATUS_ERROR_OPERATION_FAILED);
+        dst.pData += dst.iPitch;
+        src.pData += src.iPitch;
+    }
+    return VA_STATUS_SUCCESS;
+}
+
+static uint32_t DdiMedia_GetChromaPitchHeight(PDDI_MEDIA_SURFACE mediaSurface, uint32_t *chromaWidth, uint32_t *chromaPitch, uint32_t *chromaHeight);
+
 //!
 //! \brief  Copy data from a VAImage to a surface
 //! \details    Image must be in a format supported by the implementation
@@ -4648,15 +4665,6 @@ VAStatus DdiMedia_PutImage(
     uint32_t         dest_height
 )
 {
-    DDI_UNUSED(src_x);
-    DDI_UNUSED(src_y);
-    DDI_UNUSED(src_width);
-    DDI_UNUSED(src_height);
-    DDI_UNUSED(dest_x);
-    DDI_UNUSED(dest_y);
-    DDI_UNUSED(dest_width);
-    DDI_UNUSED(dest_height);
-
     DDI_FUNCTION_ENTER();
 
     DDI_CHK_NULL(ctx,                     "nullptr ctx.",                    VA_STATUS_ERROR_INVALID_CONTEXT);
@@ -4705,10 +4713,115 @@ VAStatus DdiMedia_PutImage(
         return VA_STATUS_ERROR_UNKNOWN;
     }
 
-    //copy data from image to surferce
-    //this is temp solution, will copy by difference size and difference format in further
-    MOS_STATUS eStatus = MOS_SecureMemcpy(surfData, mediaSurface->data_size, imageData, vaimg->data_size);
-    DDI_CHK_CONDITION((eStatus != MOS_STATUS_SUCCESS), "DDI:Failed to copy image to surface buffer data!", VA_STATUS_ERROR_OPERATION_FAILED);
+    if (src_x == 0 && src_y == 0 &&
+       dest_x == 0 && dest_y == 0)
+    {
+        if (src_width == dest_width && src_height == dest_height &&
+           vaimg->width==src_width && vaimg->height == src_height &&
+           mediaSurface->iWidth==src_width && mediaSurface->iHeight == src_height &&
+           mediaSurface->data_size == vaimg->data_size
+           )
+        {   // Use memcpy when
+            // - source and destination rectangles are the same
+            // - frame size and crop rectangle are the same
+            // - frames have the same layout in memory
+            //copy data from image to surferce
+            //this is temp solution, will copy by difference size and difference format in further
+            MOS_STATUS eStatus = MOS_SecureMemcpy(surfData, mediaSurface->data_size, imageData, vaimg->data_size);
+            DDI_CHK_CONDITION((eStatus != MOS_STATUS_SUCCESS), "DDI:Failed to copy image to surface buffer data!", VA_STATUS_ERROR_OPERATION_FAILED);
+        }
+        else
+        {
+            {   // copy the first plane of the surface
+                DDI_MEDIA_SURFACE yDstPlane = *mediaSurface;
+                DDI_MEDIA_SURFACE ySrcPlane{};
+
+                ySrcPlane.iWidth = src_width;
+                ySrcPlane.iRealHeight = src_height;
+                ySrcPlane.pData = (uint8_t*)imageData + vaimg->offsets[0];
+                ySrcPlane.iPitch = vaimg->pitches[0];
+
+                yDstPlane.iWidth = ySrcPlane.iWidth;
+                yDstPlane.iRealHeight = ySrcPlane.iRealHeight;
+                yDstPlane.pData = (uint8_t*)surfData;
+                DdiMedia_CopyPlane(yDstPlane, ySrcPlane);
+            }
+
+            if (vaimg->num_planes > 1)
+            {
+                DDI_MEDIA_SURFACE uDstPlane = *mediaSurface;
+                DDI_MEDIA_SURFACE uSrcPlane = *mediaSurface;
+
+                uSrcPlane.iWidth = src_width;
+                uSrcPlane.iRealHeight = src_height;
+                uSrcPlane.iHeight = src_height;
+                uint32_t chromaWidth = 0;
+                uint32_t chromaHeight= 0;
+                uint32_t chromaPitch = 0;
+                uint32_t surfacePlaneCount = DdiMedia_GetChromaPitchHeight(&uSrcPlane, &chromaWidth, &chromaPitch, &chromaHeight);
+                printf("surfacePlaneCount %d %d \n", surfacePlaneCount, vaimg->num_planes);
+                //uint32_t surfacePlaneCount = DdiMedia_GetChromaPitchHeight(&uSrcPlane, &uDstPlane.iWidth, &uDstPlane.iRealHeight, &uDstPlane.iPitch);
+                DDI_CHK_CONDITION((surfacePlaneCount != vaimg->num_planes), "DDI:Failed to copy image to surface buffer, diffrent number of planes.", VA_STATUS_ERROR_OPERATION_FAILED);
+                uDstPlane.iWidth = chromaWidth;
+                uDstPlane.iRealHeight = chromaHeight;
+                uDstPlane.iPitch = chromaPitch;
+
+                uSrcPlane.iWidth = uDstPlane.iWidth;
+                uSrcPlane.iRealHeight = uDstPlane.iRealHeight;
+                uSrcPlane.pData = (uint8_t*)imageData + vaimg->offsets[1];
+                uSrcPlane.iPitch = vaimg->pitches[1];
+
+                uDstPlane.pData = (uint8_t*)surfData + mediaSurface->iPitch * mediaSurface->iHeight;
+
+                DdiMedia_CopyPlane(uDstPlane, uSrcPlane);
+                if (vaimg->num_planes > 2)
+                {
+                    DDI_MEDIA_SURFACE vDstPlane = uDstPlane;
+                    DDI_MEDIA_SURFACE vSrcPlane = uSrcPlane;
+
+                    vSrcPlane.pData = (uint8_t*)imageData + vaimg->offsets[2];
+                    vSrcPlane.iPitch = vaimg->pitches[2];
+
+                    uint32_t chromaWidth = 0;
+                    uint32_t chromaHeight= 0;
+                    uint32_t chromaPitch = 0;
+                    uint32_t surfacePlaneCount = DdiMedia_GetChromaPitchHeight(mediaSurface, &chromaWidth, &chromaHeight, &chromaPitch);
+                    vDstPlane.pData = (uint8_t*)surfData + mediaSurface->iPitch * mediaSurface->iHeight + chromaPitch * chromaHeight;
+
+                    DdiMedia_CopyPlane(vDstPlane, vSrcPlane);
+                }
+            }
+/*                
+            if (src_width == dst_width && 
+                src_height == dest_height)
+            {
+                if()
+                uint32_t dstPlanes[3]{mediaSurface->};
+                uint32_t chromaWidth = 0;
+                uint32_t chromaHeight= 0;
+                uint32_t chromaPitch = 0;
+                uint32_t surfacePlaneCount = DdiMedia_GetChromaPitchHeight(mediaSurface, &chromaWidth, &chromaHeight, &chromaPitch);
+                DDI_CHK_CONDITION((surfacePlaneCount != vaimg->num_planes), "DDI:Failed to copy image to surface buffer, diffrent number of planes.");
+    
+                for(int plane = 0;  i < vaimg->num_planes; i += 1)
+                {
+                    uint32_t pitchSrc = vaimg->offsets[plane];
+                    char *planeSrc = (char*)imageData + vaimg->offsets[plane];
+                    uint32_t rowSize = planeElementSize*std::min(dst_width, src_width);
+    
+                    for(int y = src_y; y < std::min(src_y + src_height, vaimg->height); y += 1)
+                    {
+                        MOS_STATUS eStatus = MOS_SecureMemcpy(??, rowSize, planeSrc + y * pitchSrc, rowSize);
+                        DDI_CHK_CONDITION((eStatus != MOS_STATUS_SUCCESS), "DDI:Failed to copy image to surface buffer data!", VA_STATUS_ERROR_OPERATION_FAILED);
+                    }
+                }
+            }*/
+        }
+    }
+    else
+    {
+
+    }
 
     status = DdiMedia_UnmapBuffer(ctx, vaimg->buf);
     if (status != VA_STATUS_SUCCESS)
