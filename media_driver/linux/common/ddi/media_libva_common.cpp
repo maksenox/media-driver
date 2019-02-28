@@ -289,13 +289,16 @@ DDI_MEDIA_SURFACE* DdiMedia_GetSurfaceFromVASurfaceID (PDDI_MEDIA_CONTEXT mediaC
 
     DDI_CHK_NULL(mediaCtx, "nullptr mediaCtx", nullptr);
 
-    i                = (uint32_t)surfaceID;
-    DDI_CHK_LESS(i, mediaCtx->pSurfaceHeap->uiAllocatedHeapElements, "invalid surface id", nullptr);
-    DdiMediaUtil_LockMutex(&mediaCtx->SurfaceMutex);
-    surfaceElement  = (PDDI_MEDIA_SURFACE_HEAP_ELEMENT)mediaCtx->pSurfaceHeap->pHeapBase;
-    surfaceElement += i;
-    surface         = surfaceElement->pSurface;
-    DdiMediaUtil_UnLockMutex(&mediaCtx->SurfaceMutex);
+    if(i != VA_INVALID_SURFACE)
+    {
+        i = (uint32_t)surfaceID;
+        DDI_CHK_LESS(i, mediaCtx->pSurfaceHeap->uiAllocatedHeapElements, "invalid surface id", nullptr);
+        DdiMediaUtil_LockMutex(&mediaCtx->SurfaceMutex);
+        surfaceElement  = (PDDI_MEDIA_SURFACE_HEAP_ELEMENT)mediaCtx->pSurfaceHeap->pHeapBase;
+        surfaceElement += i;
+        surface         = surfaceElement->pSurface;
+        DdiMediaUtil_UnLockMutex(&mediaCtx->SurfaceMutex);
+    }
 
     return surface;
 }
