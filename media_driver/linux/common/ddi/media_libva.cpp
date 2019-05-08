@@ -4753,7 +4753,8 @@ VAStatus DdiMedia_PutImage(
         }
 
         //Copy data from image to temp surferce
-        MOS_STATUS eStatus = MOS_SecureMemcpy(tempSurfData, vaimg->data_size, imageData, vaimg->data_size);
+        uint32_t commonSize = std::min(tempMediaSurface->data_size, vaimg->data_size);
+        MOS_STATUS eStatus = MOS_SecureMemcpy(tempSurfData, commonSize, imageData, commonSize);
         if (eStatus != MOS_STATUS_SUCCESS)
         {
             DDI_ASSERTMESSAGE("Failed to copy image to surface buffer.");
