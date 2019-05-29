@@ -357,6 +357,8 @@ int32_t  DdiMediaUtil_OpenGraphicsAdaptor(char *devName);
 //!
 VAStatus DdiMediaUtil_UnRegisterRTSurfaces(VADriverContextP    ctx, VASurfaceID surface_id);
 
+
+VAStatus DdiMediaUtil_BeginSurfaces(VADriverContextP ctx);
 //------------------------------------------------------------------------------
 // Macros for debug messages, Assert, Null check and condition check within ddi files
 //------------------------------------------------------------------------------

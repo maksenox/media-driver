@@ -1005,9 +1005,6 @@ VAStatus DdiEncodeAvc::EncodeInCodecHal(uint32_t numSlices)
     DDI_MEDIA_SURFACE* curr_recon_target = DdiMedia_GetSurfaceFromVASurfaceID(m_encodeCtx->pMediaCtx, pRTTbl->GetCurrentReconTarget());
     DdiMedia_MediaSurfaceToMosResource(curr_recon_target, &(reconSurface->OsResource));
 
-    //clear registered recon/ref surface flags
-    m_encodeCtx->pRTtbl->ReleaseDPBRenderTargets();
-
     // Bitstream surface
     PMOS_RESOURCE bitstreamSurface = &encodeParams->resBitstreamBuffer;
     *bitstreamSurface        = m_encodeCtx->resBitstreamBuffer;  // in render picture
@@ -1412,7 +1409,7 @@ VAStatus DdiEncodeAvc::ParsePicParams(
     {
         if(pic->ReferenceFrames[i].picture_id!= VA_INVALID_SURFACE)
         {
-            m_encodeCtx->pRTtbl->SetRTState(pic->ReferenceFrames[i].picture_id, RT_STATE_ACTIVE_IN_CURFRAME);
+            DDI_CHK_RET(m_encodeCtx->pRTtbl->RegisterRTSurface(pic->ReferenceFrames[i].picture_id), "RegisterRTSurface failed!");
         }
         SetupCodecPicture(mediaCtx, m_encodeCtx->pRTtbl, &(picParams->RefFrameList[i]), pic->ReferenceFrames[i], picParams->FieldCodingFlag, true, false);
     }

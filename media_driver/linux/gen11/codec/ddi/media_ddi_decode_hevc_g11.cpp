@@ -236,7 +236,7 @@ VAStatus DdiDecodeHEVCG11::ParsePicParams(
     {
         if (picParamBase->ReferenceFrames[i].picture_id != VA_INVALID_SURFACE)
         {
-            m_ddiDecodeCtx->pRTtbl->SetRTState(picParamBase->ReferenceFrames[i].picture_id, RT_STATE_ACTIVE_IN_CURFRAME);
+            DDI_CHK_RET(m_ddiDecodeCtx->pRTtbl->RegisterRTSurface(picParamBase->ReferenceFrames[i].picture_id), "RegisterRTSurface failed!");
         }
         SetupCodecPicture(
             mediaCtx,

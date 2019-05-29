@@ -3154,6 +3154,8 @@ static VAStatus DdiMedia_BeginPicture (
     }
     DdiMediaUtil_UnLockMutex(&mediaCtx->SurfaceMutex);
 
+    DdiMediaUtil_BeginSurfaces(ctx);
+
     switch (ctxType)
     {
         case DDI_MEDIA_CONTEXT_TYPE_DECODER:

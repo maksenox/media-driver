@@ -265,9 +265,6 @@ VAStatus DdiEncodeMpeg2::EncodeInCodecHal(
     DDI_MEDIA_SURFACE* curr_recon_target = DdiMedia_GetSurfaceFromVASurfaceID(m_encodeCtx->pMediaCtx, pRTTbl->GetCurrentReconTarget());
     DdiMedia_MediaSurfaceToMosResource(curr_recon_target, &(reconSurface.OsResource));
 
-    //clear registered recon/ref surface flags
-    m_encodeCtx->pRTtbl->ReleaseDPBRenderTargets();
-
     // Bitstream surface
     MOS_RESOURCE bitstreamSurface;
     MOS_ZeroMemory(&bitstreamSurface, sizeof(MOS_RESOURCE));
@@ -586,7 +583,7 @@ VAStatus DdiEncodeMpeg2::ParsePicParams(
         return VA_STATUS_ERROR_INVALID_PARAMETER;
     }
     auto recon = DdiMedia_GetSurfaceFromVASurfaceID(mediaCtx, picParams->reconstructed_picture);
-    DDI_CHK_RET(m_encodeCtx->pRTtbl->RegisterRTSurface(picParams->reconstructed_picture),"RegisterRTSurfaces failed!");
+    DDI_CHK_RET(m_encodeCtx->pRTtbl->RegisterRTSurface(picParams->reconstructed_picture),"RegisterRTSurface failed!");
 
     mpeg2PicParams->m_currReconstructedPic.FrameIdx = m_encodeCtx->pRTtbl->GetFrameIdx(picParams->reconstructed_picture);
     mpeg2PicParams->m_currReconstructedPic.PicFlags = PICTURE_FRAME;
@@ -597,7 +594,7 @@ VAStatus DdiEncodeMpeg2::ParsePicParams(
 
     if (VA_INVALID_ID != picParams->forward_reference_picture)
     {
-        m_encodeCtx->pRTtbl->SetRTState(picParams->forward_reference_picture, RT_STATE_ACTIVE_IN_CURFRAME);
+        DDI_CHK_RET(m_encodeCtx->pRTtbl->RegisterRTSurface(picParams->forward_reference_picture), "RegisterRTSurface failed!");
         mpeg2PicParams->m_refFrameList[0].FrameIdx = m_encodeCtx->pRTtbl->GetFrameIdx(picParams->forward_reference_picture);
         mpeg2PicParams->m_refFrameList[0].PicFlags = PICTURE_FRAME;
     }
@@ -608,7 +605,7 @@ VAStatus DdiEncodeMpeg2::ParsePicParams(
     }
     if (VA_INVALID_ID != picParams->backward_reference_picture)
     {
-        m_encodeCtx->pRTtbl->SetRTState(picParams->backward_reference_picture, RT_STATE_ACTIVE_IN_CURFRAME);
+        DDI_CHK_RET(m_encodeCtx->pRTtbl->RegisterRTSurface(picParams->backward_reference_picture), "RegisterRTSurface failed!");
         mpeg2PicParams->m_refFrameList[1].FrameIdx = m_encodeCtx->pRTtbl->GetFrameIdx(picParams->backward_reference_picture);
         mpeg2PicParams->m_refFrameList[1].PicFlags = PICTURE_FRAME;
     }
