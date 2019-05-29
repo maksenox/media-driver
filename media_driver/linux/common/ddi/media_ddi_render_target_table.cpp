@@ -75,7 +75,7 @@ void DDI_CODEC_RENDER_TARGET_TABLE::Init(size_t max_num_entries)
 //!
 //!
 
-VAStatus DDI_CODEC_RENDER_TARGET_TABLE::RegisterRTSurface(VASurfaceID id)
+VAStatus DDI_CODEC_RENDER_TARGET_TABLE\::RegisterRTSurface(VASurfaceID id)
 {
     if (id == VA_INVALID_ID)
     {
@@ -92,26 +92,7 @@ VAStatus DDI_CODEC_RENDER_TARGET_TABLE::RegisterRTSurface(VASurfaceID id)
         while (m_free_index_pool.empty() && (m_usedSurfaces.size() > 0))
         {
             // Evict the oldest BeginPicture/EndPicture set of surface IDs
-            std::vector<VASurfaceID> lastList = m_usedSurfaces.back();
-            m_usedSurfaces.pop_back();
-
-            std::set<VASurfaceID> surfaces;
-            for (const auto &list: m_usedSurfaces)
-            {
-                surfaces.insert(list.begin(), list.end());
-            }
-
-            for (const auto &el: lastList)
-            {
-                bool unusedSurface = (surfaces.find(el) == surfaces.end());
-                if (unusedSurface)
-                {
-                    if (UnRegisterRTSurface(el) != VA_STATUS_SUCCESS)
-                    {
-                        return VA_STATUS_ERROR_OPERATION_FAILED;
-                    }
-                }
-            }
+            DDI_CHK_RET(RemoveLastHistoryElement(), "DDI_CODEC_RENDER_TARGET_TABLE::RemoveLastElement failed");
         }
 
         if (m_free_index_pool.empty())
@@ -150,7 +131,7 @@ VAStatus DDI_CODEC_RENDER_TARGET_TABLE::UnRegisterRTSurface(VASurfaceID id)
         vec.erase(std::remove(vec.begin(), vec.end(), id), vec.end());
     }
 
-    m_free_index_pool.push_front(m_va_to_rt_map[id]);
+    m_free_index_pool.push_back(m_va_to_rt_map[id]);
     m_va_to_rt_map.erase(id);
 
     return VA_STATUS_SUCCESS;
@@ -311,18 +292,48 @@ VASurfaceID DDI_CODEC_RENDER_TARGET_TABLE::GetVAID(RTTableIdx FrameIdx) const
 
     if (it != m_va_to_rt_map.end())
     {
-        id = it.first;
+        id = it->first;
     }
 
     return id;
 }
 
+VAStatus DDI_CODEC_RENDER_TARGET_TABLE::RemoveLastHistoryElement()
+{
+    std::vector<VASurfaceID> lastList = m_usedSurfaces.back();
+    m_usedSurfaces.pop_back();
+
+    std::set<VASurfaceID> surfaces;
+    for (const auto &list: m_usedSurfaces)
+    {
+        surfaces.insert(list.begin(), list.end());
+    }
+
+    for (const auto &el: lastList)
+    {
+        bool unusedSurface = (surfaces.find(el) == surfaces.end());
+        if (unusedSurface)
+        {
+            if (UnRegisterRTSurface(el) != VA_STATUS_SUCCESS)
+            {
+                return VA_STATUS_ERROR_OPERATION_FAILED;
+            }
+        }
+    }
+    return VA_STATUS_SUCCESS;
+}
 
 void DDI_CODEC_RENDER_TARGET_TABLE::BegeinPicture()
 {
     if (m_usedSurfaces[0].size() > 0)
     {
+        // maximum history length number of Begin/End picture calls it depends on async mode
+        const size_t maxHistorySize = 20;
         m_usedSurfaces.insert(m_usedSurfaces.begin(), std::vector<VASurfaceID>());
+        if (m_usedSurfaces.size() > maxHistorySize)
+        {
+            RemoveLastHistoryElement();
+        }
     }
 }
 

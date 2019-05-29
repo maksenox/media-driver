@@ -70,6 +70,8 @@ public:
     VASurfaceID GetVAID(RTTableIdx FrameIdx) const;
 
 protected:
+    VAStatus RemoveLastHistoryElement();
+
     VASurfaceID m_current_rt_surface;
     VASurfaceID m_current_recon_target;
     std::map<VASurfaceID, RTTableIdx> m_va_to_rt_map;
