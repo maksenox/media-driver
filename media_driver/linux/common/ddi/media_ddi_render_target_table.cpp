@@ -150,7 +150,7 @@ VAStatus DDI_CODEC_RENDER_TARGET_TABLE::UnRegisterRTSurface(VASurfaceID id)
         vec.erase(std::remove(vec.begin(), vec.end(), id), vec.end());
     }
 
-    m_free_index_pool.push_front(m_va_to_rt_map[id].FrameIdx);
+    m_free_index_pool.push_front(m_va_to_rt_map[id]);
     m_va_to_rt_map.erase(id);
 
     return VA_STATUS_SUCCESS;
@@ -286,7 +286,7 @@ RTTableIdx DDI_CODEC_RENDER_TARGET_TABLE::GetFrameIdx(VASurfaceID id)
         return INVALID_RT_TABLE_INDEX;
     }
 
-    return m_va_to_rt_map[id].FrameIdx;
+    return m_va_to_rt_map[id];
 }
 
 //!
@@ -303,9 +303,18 @@ RTTableIdx DDI_CODEC_RENDER_TARGET_TABLE::GetFrameIdx(VASurfaceID id)
 //!
 VASurfaceID DDI_CODEC_RENDER_TARGET_TABLE::GetVAID(RTTableIdx FrameIdx) const
 {
-    using RTPair = std::pair<VASurfaceID, DDI_CODEC_RENDER_TARGET_INFO>;
-    return std::find_if(m_va_to_rt_map.begin(), m_va_to_rt_map.end(), [=](const RTPair& pair)
-                                    {return pair.second.FrameIdx == FrameIdx;})->first;
+    using RTPair = std::pair<VASurfaceID, RTTableIdx>;
+    VASurfaceID id = VA_INVALID_ID;
+
+    auto it = std::find_if(m_va_to_rt_map.begin(), m_va_to_rt_map.end(),
+        [=](const RTPair& pair){return pair.second == FrameIdx;});
+
+    if (it != m_va_to_rt_map.end())
+    {
+        id = it.first;
+    }
+
+    return id;
 }
 
 
