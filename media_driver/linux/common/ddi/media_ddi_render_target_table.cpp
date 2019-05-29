@@ -75,7 +75,7 @@ void DDI_CODEC_RENDER_TARGET_TABLE::Init(size_t max_num_entries)
 //!
 //!
 
-VAStatus DDI_CODEC_RENDER_TARGET_TABLE\::RegisterRTSurface(VASurfaceID id)
+VAStatus DDI_CODEC_RENDER_TARGET_TABLE::RegisterRTSurface(VASurfaceID id)
 {
     if (id == VA_INVALID_ID)
     {
