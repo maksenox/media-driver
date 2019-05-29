@@ -29,7 +29,7 @@
 #include "media_libva_util.h"
 
 #include <algorithm>
-#include <vector>
+#include <set>
 
 //!
 //! \brief    Init
@@ -49,12 +49,15 @@ void DDI_CODEC_RENDER_TARGET_TABLE::Init(size_t max_num_entries)
     m_current_recon_target = VA_INVALID_ID;
     m_free_index_pool.clear();
     m_va_to_rt_map.clear();
+    m_usedSurfaces.clear();
+    m_usedSurfaces.push_back(std::vector<VASurfaceID>());
 
     for (RTTableIdx i = 0; i < max_num_entries; i++)
     {
         m_free_index_pool.push_back(i);
     }
 }
+
 //!
 //! \brief    Register Render Target Surface
 //! \details  Register surface in render target table
@@ -80,58 +83,47 @@ VAStatus DDI_CODEC_RENDER_TARGET_TABLE::RegisterRTSurface(VASurfaceID id)
         return VA_STATUS_ERROR_INVALID_PARAMETER;
     }
 
-    if (IsRegistered(id))
+    // the surface id participates in the latest Begin/End picture processing
+    // like target, recon, reference frame, or in loop filtering
+    m_usedSurfaces[0].push_back(id);
+
+    if (!IsRegistered(id))
     {
-        m_va_to_rt_map[id].RTState = RT_STATE_ACTIVE_IN_CURFRAME;
-        return VA_STATUS_SUCCESS;
-    }
-
-    if (!m_free_index_pool.empty())
-    {
-        RTTableIdx idx = m_free_index_pool.front();
-        m_free_index_pool.pop_front();
-
-        m_taken_index_history.push_back(idx);
-
-        DDI_CODEC_RENDER_TARGET_INFO info;
-        info.FrameIdx = idx;
-        info.RTState = RT_STATE_ACTIVE_IN_CURFRAME;
-
-        m_va_to_rt_map[id] = info;
-        return VA_STATUS_SUCCESS;
-    }
-    else
-    {
-        using RTPair = std::pair<VASurfaceID, DDI_CODEC_RENDER_TARGET_INFO>;
-        using RTPairIterator = std::map<VASurfaceID, DDI_CODEC_RENDER_TARGET_INFO>::iterator;
-        using IdxListIterator = std::list<RTTableIdx>::iterator;
-
-
-        // Evict the oldest inactive render target
-        RTPairIterator rt_to_evict_iter = m_va_to_rt_map.end();
-        for (auto it_list = m_taken_index_history.begin(); it_list != m_taken_index_history.end(); it_list++)
+        while (m_free_index_pool.empty() && (m_usedSurfaces.size() > 0))
         {
-            rt_to_evict_iter = std::find_if(m_va_to_rt_map.begin(), m_va_to_rt_map.end(),
-                    [&] (const RTPair& pair)
-                    { return (pair.second.FrameIdx == *it_list && pair.second.RTState == RT_STATE_INACTIVE);});
-             if (rt_to_evict_iter != m_va_to_rt_map.end())
-             {
-                 DDI_VERBOSEMESSAGE("RegisterRTSurface: FrameIdx pool is empty, had to evict render target %d", rt_to_evict_iter->first);
-                 RTTableIdx freed_idx = rt_to_evict_iter->second.FrameIdx;
+            // Evict the oldest BeginPicture/EndPicture set of surface IDs
+            std::vector<VASurfaceID> lastList = m_usedSurfaces.back();
+            m_usedSurfaces.pop_back();
 
-                 m_taken_index_history.push_back(freed_idx);
-                 m_taken_index_history.erase(it_list);
+            std::set<VASurfaceID> surfaces;
+            for (const auto &list: m_usedSurfaces)
+            {
+                surfaces.insert(list.begin(), list.end());
+            }
 
-                 m_va_to_rt_map.erase(rt_to_evict_iter);
-                 m_va_to_rt_map[id].FrameIdx = freed_idx;
-                 m_va_to_rt_map[id].RTState = RT_STATE_ACTIVE_IN_CURFRAME;
-                 return VA_STATUS_SUCCESS;
-             }
+            for (const auto &el: lastList)
+            {
+                bool unusedSurface = (surfaces.find(el) == surfaces.end());
+                if (unusedSurface)
+                {
+                    if (UnRegisterRTSurface(el) != VA_STATUS_SUCCESS)
+                    {
+                        return VA_STATUS_ERROR_OPERATION_FAILED;
+                    }
+                }
+            }
         }
 
-        DDI_ASSERTMESSAGE("RegisterRTSurface: FrameIdx pool is empty, and no render target can be evicted from the RT table!");
-        return VA_STATUS_ERROR_NOT_ENOUGH_BUFFER;
+        if (m_free_index_pool.empty())
+        {
+            return VA_STATUS_ERROR_OPERATION_FAILED;
+        }
+
+        m_va_to_rt_map[id] = m_free_index_pool.back();
+        m_free_index_pool.pop_back();
     }
+
+    return VA_STATUS_SUCCESS;
 }
 
 //!
@@ -153,7 +145,11 @@ VAStatus DDI_CODEC_RENDER_TARGET_TABLE::UnRegisterRTSurface(VASurfaceID id)
         return VA_STATUS_ERROR_INVALID_PARAMETER;
     }
 
-    m_taken_index_history.erase(std::find(m_taken_index_history.begin(), m_taken_index_history.end(), m_va_to_rt_map[id].FrameIdx));
+    for(auto &vec: m_usedSurfaces)
+    {
+        vec.erase(std::remove(vec.begin(), vec.end(), id), vec.end());
+    }
+
     m_free_index_pool.push_front(m_va_to_rt_map[id].FrameIdx);
     m_va_to_rt_map.erase(id);
 
@@ -176,55 +172,6 @@ bool DDI_CODEC_RENDER_TARGET_TABLE::IsRegistered(VASurfaceID id) const
 
 
 //!
-//! \brief    Set Render Target State
-//! \details  Sets the internal state variable for a registered render target
-//!           to a specified value.
-//!
-//! \param    [in] id
-//!           VASurfaceID of the registered render target
-//! \param    [in] state
-//!           RT_STATE to be set for the render target
-//!
-//! \return   VAStatus
-//!           VA_STATUS_SUCCESS if successful, VA_STATUS_ERROR_INVALID_PARAMETER if
-//!           no such surface is registered
-//!
-VAStatus DDI_CODEC_RENDER_TARGET_TABLE::SetRTState(VASurfaceID id, RT_STATE state)
-{
-    if (!IsRegistered(id))
-    {
-        DDI_VERBOSEMESSAGE("SetRTState: render target was not registered in the RTtbl!");
-        return VA_STATUS_ERROR_INVALID_PARAMETER;
-    }
-
-    m_va_to_rt_map[id].RTState = state;
-
-    return VA_STATUS_SUCCESS;
-}
-
-//! \brief    Release DPB render targets
-//! \details  Adjusts render target states in the render target table
-//!           so that the render targets not belonging to current or previous frame's DPB
-//!           may be evicted from the table if the table is completely filled up.
-//!           In order to avoid RT table starvation, this should be called after each
-//!           encode/decode/processing operation (usually at the end of EndPicture)
-//!
-void DDI_CODEC_RENDER_TARGET_TABLE::ReleaseDPBRenderTargets()
-{
-    for (auto& entry : m_va_to_rt_map)
-    {
-        if(entry.second.RTState == RT_STATE_ACTIVE_IN_LASTFRAME)
-        {
-            entry.second.RTState = RT_STATE_INACTIVE;
-        }
-        else if(entry.second.RTState == RT_STATE_ACTIVE_IN_CURFRAME)
-        {
-            entry.second.RTState = RT_STATE_ACTIVE_IN_LASTFRAME;
-        }
-    }
-}
-
-//!
 //! \brief    Set Current Render Target Surface
 //! \details  Sets a registered VASurfaceID as the one currently being processed ("current")
 //!
@@ -237,7 +184,7 @@ void DDI_CODEC_RENDER_TARGET_TABLE::ReleaseDPBRenderTargets()
 
 VAStatus DDI_CODEC_RENDER_TARGET_TABLE::SetCurrentRTSurface(VASurfaceID id)
 {
-    if (id != VA_INVALID_ID && !IsRegistered(id))
+    if (id != VA_INVALID_ID && (RegisterRTSurface(id) != VA_STATUS_SUCCESS))
     {
         return VA_STATUS_ERROR_INVALID_PARAMETER;
     }
@@ -271,7 +218,7 @@ VASurfaceID DDI_CODEC_RENDER_TARGET_TABLE::GetCurrentRTSurface() const
 
 VAStatus DDI_CODEC_RENDER_TARGET_TABLE::SetCurrentReconTarget(VASurfaceID id)
 {
-    if (!IsRegistered(id))
+    if (RegisterRTSurface(id) != VA_STATUS_SUCCESS)
     {
         return VA_STATUS_ERROR_INVALID_PARAMETER;
     }
@@ -362,4 +309,11 @@ VASurfaceID DDI_CODEC_RENDER_TARGET_TABLE::GetVAID(RTTableIdx FrameIdx) const
 }
 
 
+void DDI_CODEC_RENDER_TARGET_TABLE::BegeinPicture()
+{
+    if (m_usedSurfaces[0].size() > 0)
+    {
+        m_usedSurfaces.insert(m_usedSurfaces.begin(), std::vector<VASurfaceID>());
+    }
+}
 

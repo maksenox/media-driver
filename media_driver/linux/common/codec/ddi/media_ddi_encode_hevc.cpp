@@ -314,9 +314,6 @@ VAStatus DdiEncodeHevc::EncodeInCodecHal(uint32_t numSlices)
     DDI_MEDIA_SURFACE* curr_recon_target = DdiMedia_GetSurfaceFromVASurfaceID(m_encodeCtx->pMediaCtx, pRTTbl->GetCurrentReconTarget());
     DdiMedia_MediaSurfaceToMosResource(curr_recon_target, &(reconSurface.OsResource));
 
-    //clear registered recon/ref surface flags
-    m_encodeCtx->pRTtbl->ReleaseDPBRenderTargets();
-
     // Bitstream surface
     MOS_RESOURCE bitstreamSurface;
     MOS_ZeroMemory(&bitstreamSurface, sizeof(bitstreamSurface));
@@ -507,7 +504,7 @@ VAStatus DdiEncodeHevc::ParsePicParams(
 
     if(picParams->decoded_curr_pic.picture_id != VA_INVALID_SURFACE)
     {
-        DDI_CHK_RET(m_encodeCtx->pRTtbl->RegisterRTSurface(picParams->decoded_curr_pic.picture_id), "RegisterRTSurfaces failed!");
+        DDI_CHK_RET(m_encodeCtx->pRTtbl->RegisterRTSurface(picParams->decoded_curr_pic.picture_id), "RegisterRTSurface failed!");
     }
 
     // Curr Recon Pic
@@ -533,7 +530,7 @@ VAStatus DdiEncodeHevc::ParsePicParams(
     {
         if(picParams->reference_frames[i].picture_id != VA_INVALID_SURFACE)
         {
-            DDI_CHK_RET(m_encodeCtx->pRTtbl->SetRTState(picParams->reference_frames[i].picture_id, RT_STATE_ACTIVE_IN_CURFRAME), "SetRTState failed!");
+            DDI_CHK_RET(m_encodeCtx->pRTtbl->RegisterRTSurface(picParams->reference_frames[i].picture_id),  "RegisterRTSurface failed!");
         }
         SetupCodecPicture(
             mediaCtx,

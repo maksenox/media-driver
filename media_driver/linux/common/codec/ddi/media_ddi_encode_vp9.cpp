@@ -190,9 +190,6 @@ VAStatus DdiEncodeVp9::EncodeInCodecHal(uint32_t numSlices)
     bitstreamSurface        = m_encodeCtx->resBitstreamBuffer;  // in render picture
     bitstreamSurface.Format = Format_Buffer;
 
-    //clear registered recon/ref surface flags
-    m_encodeCtx->pRTtbl->ReleaseDPBRenderTargets();
-
     encodeParams.psRawSurface               = &rawSurface;
     encodeParams.psReconSurface             = &reconSurface;
     encodeParams.presBitstreamBuffer        = &bitstreamSurface;
@@ -652,7 +649,7 @@ VAStatus DdiEncodeVp9::ParsePicParams(DDI_MEDIA_CONTEXT *mediaCtx, void *ptr)
     {
         if (picParam->reference_frames[i] != VA_INVALID_SURFACE)
         {
-            pRTTbl->SetRTState(picParam->reference_frames[i], RT_STATE_ACTIVE_IN_CURFRAME);
+            DDI_CHK_RET(pRTTbl->RegisterRTSurface(picParam->reference_frames[i]), "RegisterRTSurface failed!");
         }
         SetupCodecPicture(
             mediaCtx,

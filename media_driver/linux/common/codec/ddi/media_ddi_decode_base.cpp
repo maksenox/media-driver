@@ -199,8 +199,7 @@ VAStatus DdiMediaDecode::BeginPicture(
     DDI_CODEC_RENDER_TARGET_TABLE* pRTTbl = m_ddiDecodeCtx->pRTtbl;
 
     // register render targets
-    DDI_CHK_RET(pRTTbl->RegisterRTSurface(renderTarget),"RegisterRTSurfaces failed!");
-    pRTTbl->SetCurrentRTSurface(renderTarget);
+    DDI_CHK_RET(pRTTbl->SetCurrentRTSurface(renderTarget),"SetCurrentRTSurface failed!");
 
     m_streamOutEnabled              = false;
     m_ddiDecodeCtx->DecodeParams.m_numSlices       = 0;
@@ -663,7 +662,6 @@ VAStatus DdiMediaDecode::EndPicture(
     DDI_CHK_RET(InitDecodeParams(ctx,context),"InitDecodeParams failed!");
 
     DDI_CHK_RET(SetDecodeParams(), "SetDecodeParams failed!");
-    m_ddiDecodeCtx->pRTtbl->ReleaseDPBRenderTargets();
     if (m_ddiDecodeCtx->pCodecHal == nullptr)
     {
         return VA_STATUS_ERROR_ALLOCATION_FAILED;
