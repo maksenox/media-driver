@@ -71,7 +71,7 @@ VAStatus DdiMediaDecode::BasicInit(
         return VA_STATUS_ERROR_ALLOCATION_FAILED;
     }
 
-    m_ddiDecodeCtx->pRTtbl = MOS_New(DDI_CODEC_RENDER_TARGET_TABLE);
+    m_ddiDecodeCtx->pRTtbl = MOS_New(MediaDdiRenderTargetTable);
 
     if (m_ddiDecodeCtx->pRTtbl == nullptr)
     {
@@ -211,11 +211,10 @@ VAStatus DdiMediaDecode::BeginPicture(
     DDI_CHK_NULL(curRT, "nullptr pCurRT", VA_STATUS_ERROR_INVALID_SURFACE);
     curRT->pDecCtx = m_ddiDecodeCtx;
 
-    DDI_CODEC_RENDER_TARGET_TABLE* pRTTbl = m_ddiDecodeCtx->pRTtbl;
+    MediaDdiRenderTargetTable* pRTTbl = m_ddiDecodeCtx->pRTtbl;
 
     // register render targets
-    DDI_CHK_RET(pRTTbl->RegisterRTSurface(renderTarget),"RegisterRTSurfaces failed!");
-    pRTTbl->SetCurrentRTSurface(renderTarget);
+    DDI_CHK_RET(pRTTbl->SetCurrentRTSurface(renderTarget),"SetCurrentRTSurface failed!");
 
     m_streamOutEnabled              = false;
     m_ddiDecodeCtx->DecodeParams.m_numSlices       = 0;
@@ -611,7 +610,7 @@ VAStatus DdiMediaDecode::InitDecodeParams(
     memset(&m_destSurface, 0, sizeof(MOS_SURFACE));
     m_destSurface.dwOffset = 0;
 
-    DDI_CODEC_RENDER_TARGET_TABLE* pRTTbl = m_ddiDecodeCtx->pRTtbl;
+    MediaDdiRenderTargetTable* pRTTbl = m_ddiDecodeCtx->pRTtbl;
 
     if (pRTTbl->GetCurrentRTSurface() == VA_INVALID_ID)
     {
@@ -735,7 +734,6 @@ VAStatus DdiMediaDecode::EndPicture(
     DDI_CHK_RET(InitDecodeParams(ctx,context),"InitDecodeParams failed!");
 
     DDI_CHK_RET(SetDecodeParams(), "SetDecodeParams failed!");
-    m_ddiDecodeCtx->pRTtbl->ReleaseDPBRenderTargets();
     if (m_ddiDecodeCtx->pCodecHal == nullptr)
     {
         return VA_STATUS_ERROR_ALLOCATION_FAILED;
