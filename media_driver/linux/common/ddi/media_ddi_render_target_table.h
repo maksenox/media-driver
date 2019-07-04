@@ -47,7 +47,6 @@ class MediaDdiRenderTargetTable
 public:
     MediaDdiRenderTargetTable()
     {
-        m_maxNumEntries = 0;
         m_currentRtSurface = VA_INVALID_ID;
         m_currentReconTarget = VA_INVALID_ID;
     }
