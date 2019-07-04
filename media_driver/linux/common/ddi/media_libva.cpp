@@ -4798,7 +4798,7 @@ VAStatus DdiMedia_PutImage(
                 DDI_CHK_CONDITION((eStatus != MOS_STATUS_SUCCESS), "Failed to copy image to surface buffer.", VA_STATUS_ERROR_OPERATION_FAILED);
             }
             else {
-                MOS_STATUS eStatus = MOS_SecureMemcpy(tempSurfData, vaimg->data_size, imageData, vaimg->data_size);
+                MOS_STATUS eStatus = MOS_SecureMemcpy(surfData, vaimg->data_size, imageData, vaimg->data_size);
                 DDI_CHK_CONDITION((eStatus != MOS_STATUS_SUCCESS), "Failed to copy image to surface buffer.", VA_STATUS_ERROR_OPERATION_FAILED);
             }
         }
