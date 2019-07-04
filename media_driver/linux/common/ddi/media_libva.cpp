@@ -4726,8 +4726,13 @@ VAStatus DdiMedia_PutImage(
         }
 
         //Copy data from image to temp surferce
-        uint32_t commonSize = std::min(tempMediaSurface->data_size, vaimg->data_size);
-        MOS_STATUS eStatus = MOS_SecureMemcpy(tempSurfData, commonSize, imageData, commonSize);
+        if(0) {
+            uint32_t commonSize = std::min(tempMediaSurface->data_size, vaimg->data_size);
+            MOS_STATUS eStatus = MOS_SecureMemcpy(tempSurfData, commonSize, imageData, commonSize);
+        }
+        else {
+            MOS_STATUS eStatus = MOS_SecureMemcpy(tempSurfData, vaimg->data_size, imageData, vaimg->data_size);
+        }
         if (eStatus != MOS_STATUS_SUCCESS)
         {
             DDI_ASSERTMESSAGE("Failed to copy image to surface buffer.");
@@ -4786,9 +4791,15 @@ VAStatus DdiMedia_PutImage(
         {
             // Copy data from image to surface 
             // Use single memcpy function if we copy the full frames with the same memory layout
-            uint32_t commonSize = std::min(mediaSurface->data_size, vaimg->data_size);
-            MOS_STATUS eStatus = MOS_SecureMemcpy(surfData, commonSize, imageData, commonSize);
-            DDI_CHK_CONDITION((eStatus != MOS_STATUS_SUCCESS), "Failed to copy image to surface buffer.", VA_STATUS_ERROR_OPERATION_FAILED);
+            if(0) {
+                uint32_t commonSize = std::min(mediaSurface->data_size, vaimg->data_size);
+                MOS_STATUS eStatus = MOS_SecureMemcpy(surfData, commonSize, imageData, commonSize);
+                DDI_CHK_CONDITION((eStatus != MOS_STATUS_SUCCESS), "Failed to copy image to surface buffer.", VA_STATUS_ERROR_OPERATION_FAILED);
+            }
+            else {
+                MOS_STATUS eStatus = MOS_SecureMemcpy(tempSurfData, vaimg->data_size, imageData, vaimg->data_size);
+                DDI_CHK_CONDITION((eStatus != MOS_STATUS_SUCCESS), "Failed to copy image to surface buffer.", VA_STATUS_ERROR_OPERATION_FAILED);
+            }
         }
         else
         {
