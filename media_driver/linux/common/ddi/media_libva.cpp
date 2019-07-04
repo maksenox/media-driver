@@ -4724,15 +4724,16 @@ VAStatus DdiMedia_PutImage(
             DdiMedia_DestroySurfaces(ctx, &tempSurface, 1);
             return VA_STATUS_ERROR_SURFACE_BUSY;
         }
-
+        MOS_STATUS eStatus;
         //Copy data from image to temp surferce
         if(0) {
             uint32_t commonSize = std::min(tempMediaSurface->data_size, vaimg->data_size);
-            MOS_STATUS eStatus = MOS_SecureMemcpy(tempSurfData, commonSize, imageData, commonSize);
+            eStatus = MOS_SecureMemcpy(tempSurfData, commonSize, imageData, commonSize);
         }
         else {
-            MOS_STATUS eStatus = MOS_SecureMemcpy(tempSurfData, vaimg->data_size, imageData, vaimg->data_size);
+            eStatus = MOS_SecureMemcpy(tempSurfData, vaimg->data_size, imageData, vaimg->data_size);
         }
+
         if (eStatus != MOS_STATUS_SUCCESS)
         {
             DDI_ASSERTMESSAGE("Failed to copy image to surface buffer.");
